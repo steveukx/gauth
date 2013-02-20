@@ -209,35 +209,58 @@
     */
    GAuth.prototype.middleware = function(absoluteBaseUrl, userDb) {
 
+      var googleAuth = this;
+
+      var decodeResponse = function(url) {
+         var response = /openid.ext1.value.email/.test(url) ? require('url').parse(url, true).query : {};
+         for(var key in response) {
+            response[key.replace(/^.*\./, '')] = response[key];
+            delete response[key];
+         }
+
+         console.log('DECODING', url, response);
+         return response;
+      };
+
       return function(req, res, next) {
 
          // when no user attached - straight through to the login url
+         if(!req.session.user && !(req.session._user = decodeResponse(req.url)).email) {
+            googleAuth.logIn(req.originalUrl).then(function(url) {console.log(url); res.redirect(url)} );
+            return;
+         }
+
+         // validated on this request, set as the user (optionally through the user authenticator)
+         if(!req.session.user && req.session._user.email) {
+            if(userDb) {
+               userDb.getUser(req.session._user, function(err, user) {
+                  if(err) {
+                     next(err);
+                  }
+                  else {
+                     req.session.user = user;
+                     res.redirect(req.query.next);
+                  }
+               });
+            }
+            else {
+               req.session.user = req.session._user;
+               delete req.session._user;
+               res.redirect(req.query.next);
+            }
+            return;
+         }
+
+         // managed to get here - so not yet authenticated and no email was decoded
          if(!req.session.user) {
-            res.redirect(this.logIn(req.origialUrl));
-            return undefined;
+            next(new Error("Unable to authenticate user"));
+            return;
          }
 
-         // when the URL is the response URL,
+         // last but not least, session already has a user in it, so just head on with processing the request
+         next();
 
-         if(controlledUrlPrefix.test(req.url)) {
-            return res.redirect(this.logIn(req.origialUrl));
-         }
-
-         // not one of my URLs and not logged in
-         if(!controlledUrlPrefix.test(req.url) && !req.session.user) {
-            res.redirect(this.logIn(req.originalUrl));
-         }
-
-         else if(req.session.user.authenticating) {
-
-         }
-
-         else {
-            next();
-         }
-
-         return null;
-      }.bind(this);
+      };
    };
 
 

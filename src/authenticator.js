@@ -50,7 +50,12 @@
       var params = this._getLoginParameters();
       params['openid.return_to'] += '?next=' + backTo;
 
-      return this._endPointUrl + '?' + require('querystring').stringify(params);
+      var url = this._endPointUrl + '?';
+      for(var key in params) {
+         url += key + '=' + encodeURIComponent(params[key]) + '&';
+      }
+
+      return url;
    };
 
    /**
@@ -98,7 +103,7 @@
 
       return params;
    };
-   
+
    /**
     * Gets the URL parameters used for cancelling the association of the google account with this application
     * @return {Object}
@@ -120,8 +125,8 @@
          'openid.assoc_handle': this._assocHandle
       };
    };
-   
-   
+
+
 
    module.exports = Authenticator;
 
