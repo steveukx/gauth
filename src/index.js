@@ -228,16 +228,18 @@
 
       return function(req, res, next) {
 
+         var oAuthUser;
+
          // when no user attached - straight through to the login url
-         if(!req.session.user && !(req.session._user = decodeResponse(req.url)).email) {
+         if(!req.session.user && !(oAuthUser = decodeResponse(req.url)).email) {
             googleAuth.logIn(req.originalUrl).then(function(url) {console.log('GAuth: redirecting user to ', url); res.redirect(url)} );
             return;
          }
 
          // validated on this request, set as the user (optionally through the user authenticator)
-         if(!req.session.user && req.session._user.email) {
+         if(!req.session.user && oAuthUser.email) {
             if(getUserFn) {
-               getUserFn(req.session._user, function(err, user) {
+               getUserFn(oAuthUser, function(err, user) {
                   if(err) {
                      next(err);
                   }
@@ -248,8 +250,7 @@
                });
             }
             else {
-               req.session.user = req.session._user;
-               delete req.session._user;
+               req.session.user = oAuthUser;
                res.redirect(req.query.next);
             }
             return;
