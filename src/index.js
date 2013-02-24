@@ -31,6 +31,7 @@
           .then(this._buildAuthenticator, this)
           .then(this._ready, this)
    }
+
    GAuth.prototype = Object.create(Subscribable.prototype);
 
    /**
@@ -151,6 +152,8 @@
     *
     * @param {String} key
     * @param {String|Object} value
+    * @name GAuth.configure
+    * @function
     */
    GAuth.configure = GAuth.prototype._configure = function (key, value) {
       if (this instanceof GAuth) {
@@ -201,13 +204,14 @@
    };
 
    /**
+    * Creates an Express compatible middleware component that will force all requests to have a user object on their
+    * session. Note that session management is assumed and not implemented in this middleware, consider using
+    * express.cookieParser and express.cookieSession before using this middleware.
     *
-    *
-    * @param absoluteBaseUrl
-    * @param userDb
-    * @return {*}
+    * @param {Function} [getUserFn] When supplied, used as a validator of the user once validated by Google
+    * @return {Function}
     */
-   GAuth.prototype.middleware = function(absoluteBaseUrl, userDb) {
+   GAuth.prototype.middleware = function(getUserFn) {
 
       var googleAuth = this;
 
@@ -218,7 +222,7 @@
             delete response[key];
          }
 
-         console.log('DECODING', url, response);
+         console.log('GAuth: decoding response from url ', url, response);
          return response;
       };
 
@@ -226,14 +230,14 @@
 
          // when no user attached - straight through to the login url
          if(!req.session.user && !(req.session._user = decodeResponse(req.url)).email) {
-            googleAuth.logIn(req.originalUrl).then(function(url) {console.log(url); res.redirect(url)} );
+            googleAuth.logIn(req.originalUrl).then(function(url) {console.log('GAuth: redirecting user to ', url); res.redirect(url)} );
             return;
          }
 
          // validated on this request, set as the user (optionally through the user authenticator)
          if(!req.session.user && req.session._user.email) {
-            if(userDb) {
-               userDb.getUser(req.session._user, function(err, user) {
+            if(getUserFn) {
+               getUserFn(req.session._user, function(err, user) {
                   if(err) {
                      next(err);
                   }
